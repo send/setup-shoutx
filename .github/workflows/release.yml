@@ -1,0 +1,66 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: action-release
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      prerelease: ${{ steps.metadata.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version-file: .node-version
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm run lint
+      - run: npm test
+      - id: metadata
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          # shellcheck disable=SC2016
+          node -e 'const fs=require("node:fs"); const v=require("./package.json").version; if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$/.test(v) || process.env.TAG !== `v${v}`) process.exit(1); fs.appendFileSync(process.env.GITHUB_OUTPUT,`prerelease=${v.includes("-")}\n`)'
+      - name: Require successful main validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for workflow in ci.yml codeql.yml; do
+            gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs" \
+              -f head_sha="$GITHUB_SHA" -f branch=main -f event=push -f per_page=1 \
+              --jq '.workflow_runs[0] | .status == "completed" and .conclusion == "success"' | grep -qx true
+          done
+  publish:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+      PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+    steps:
+      - name: Publish action release
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GH_REPO/commits/$TAG" --jq '.sha')" = "$GITHUB_SHA"
+          args=("$TAG" --draft --verify-tag --generate-notes)
+          if [[ "$PRERELEASE" == true ]]; then args+=(--prerelease); fi
+          gh release create "${args[@]}"
+          gh release edit "$TAG" --draft=false --prerelease="$PRERELEASE" --latest=false
+          gh api "repos/$GH_REPO/releases/tags/$TAG" --jq '.immutable' | grep -qx true

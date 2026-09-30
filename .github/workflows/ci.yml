@@ -1,0 +1,51 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version-file: .node-version
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm run lint
+      - run: npm test
+      - name: Install real immutable CLI release
+        id: install
+        uses: ./
+        with:
+          shoutx-version: '0.3.0-rc.1'
+          checksums-sha256: b280ecb4122b02c0961638c0eb84bae6932af55193c3ea9ae2aa2b02ef8afa99
+          github-token: ${{ github.token }}
+      - name: Verify output and subsequent-step PATH
+        shell: bash
+        env:
+          INSTALLED_VERSION: ${{ steps.install.outputs.version }}
+        run: |
+          test "$INSTALLED_VERSION" = '0.3.0-rc.1'
+          test "$(shoutx --version)" = 'shoutx 0.3.0-rc.1'
+          test "$(shoutx github-actions:output test value)" = 'test=value'
+  result:
+    name: CI result
+    if: ${{ always() }}
+    needs: verify
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          RESULT: ${{ needs.verify.result }}
+        run: test "$RESULT" = success
