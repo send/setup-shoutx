@@ -45,4 +45,16 @@ test('ZIP rejects metadata disagreement, encryption, descriptors, extras, ZIP64 
     assert.throws(()=>extract(bytes,root,windows),String(offset));
   }
   for(const bytes of [original.subarray(0,-1),Buffer.concat([original,Buffer.from([0])]),Buffer.concat([Buffer.from([0]),original])]) assert.throws(()=>extract(bytes,root,windows));
+  for(const flag of [1,8,64,0x2000]) {const b=Buffer.from(original);b.writeUInt16LE(flag,6);b.writeUInt16LE(flag,cd+8);assert.throws(()=>extract(b,root,windows));}
+  const method=Buffer.from(original);method.writeUInt16LE(12,8);method.writeUInt16LE(12,cd+10);assert.throws(()=>extract(method,root,windows));
+  assert.throws(()=>extract(f.zip([...f.files(root,'shoutx.exe'),{name:`${root}/x`},{name:`${root}/y`}]),root,windows));
+});
+test('gzip optional headers, CRC and reserved flags',()=>{
+  const packed=f.tar(f.files(root));const header=Buffer.from(packed.subarray(0,10));header[3]=4|8|16|2;
+  const optional=Buffer.concat([header,Buffer.from([2,0,42,43]),Buffer.from('filename\0comment\0')]);
+  const crc=Buffer.alloc(2);crc.writeUInt16LE(z.crc32(optional)&0xffff);
+  const valid=Buffer.concat([optional,crc,packed.subarray(10)]);
+  assert.equal(extract(valid,root,posix).toString(),'fixture');
+  const invalid=Buffer.from(valid);invalid[optional.length]^=1;assert.throws(()=>extract(invalid,root,posix));
+  const reserved=Buffer.from(packed);reserved[3]=0x80;assert.throws(()=>extract(reserved,root,posix));
 });

@@ -47,6 +47,22 @@ test('redirects strip credentials even on API origin and prohibit downgrade',asy
   }
   for(const location of ['http://cdn.example','https://user:pass@cdn.example','https://cdn.example/#fragment']) await assert.rejects(createClient(transport([{status:302,headers:{location}}])).get('https://api.github.com/start',10,'secret'));
   const loop=Array.from({length:6},()=>({status:302,headers:{location:'/loop'}}));await assert.rejects(createClient(transport(loop)).get('https://api.github.com/start',10));
+  const five=Array.from({length:5},()=>({status:302,headers:{location:'/loop'}}));five.push({body:'ok'});
+  assert.equal((await createClient(transport(five)).get('https://api.github.com/start',10)).toString(),'ok');
+  await assert.rejects(createClient(transport([{status:302}])).get('https://api.github.com/start',10));
+});
+test('deadline includes redirect hops and a slow body',async t=>{
+  t.mock.timers.enable({apis:['setTimeout','Date'],now:1000});
+  let calls=0;
+  const c=createClient((url,options,callback)=>{
+    const req=new EventEmitter();req.destroy=()=>{};req.end=()=>queueMicrotask(()=>{
+      const res=new PassThrough();res.headers={};
+      if(calls++===0){t.mock.timers.tick(20000);res.statusCode=302;res.headers.location='/next';callback(res);}
+      else {res.statusCode=200;callback(res);res.write('x');}
+    });return req;
+  });
+  const failure=assert.rejects(c.get('https://api.github.com/start',100));
+  await new Promise(resolve=>setImmediate(resolve));t.mock.timers.tick(10001);await failure;assert.equal(calls,2);
 });
 test('bounded bodies, rate limits, encoding, abort and truncation fail closed',async()=>{
   for(const response of [{status:429},{status:403},{status:500},{body:'12345'},{headers:{'content-length':'5'},body:'12345'},{headers:{'content-length':'3'},body:'12'},{headers:{'content-length':'NaN'}},{headers:{'content-encoding':'gzip'}},{aborted:true}]) await assert.rejects(createClient(transport([response])).get('https://api.github.com/start',4));

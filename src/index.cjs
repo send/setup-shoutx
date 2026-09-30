@@ -11,7 +11,7 @@ function fail() {
   process.exit(1);
 }
 process.removeAllListeners('warning');
-process.on('warning', fail);
+process.on('warning', () => { /* Never render warning objects or abort a valid install. */ });
 process.on('uncaughtException', fail);
 process.on('unhandledRejection', fail);
 try { Promise.resolve(require('./bundle.cjs').install()).catch(fail); } catch { fail(); }

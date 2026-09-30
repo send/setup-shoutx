@@ -15,7 +15,7 @@ async function fixture(t) {
 }
 test('invalid inputs or command files fail before network and leave files unchanged',async t=>{
   const f=await fixture(t);let calls=0;const client={download:async()=>{calls++;throw new Error('::error::secret');}};
-  for(const patch of [{'INPUT_SHOUTX-VERSION':'latest'},{RUNNER_ARCH:'invalid'},{GITHUB_PATH:''},{GITHUB_OUTPUT:f.paths},{NODE_OPTIONS:'--require secret'},{'INPUT_CHECKSUMS-SHA256':'bad'}]) {
+  for(const patch of [{'INPUT_SHOUTX-VERSION':'latest'},{RUNNER_ARCH:'invalid'},{GITHUB_PATH:''},{GITHUB_PATH:f.tmp},{GITHUB_PATH:path.join(f.tmp,'missing')},{GITHUB_OUTPUT:f.paths},{NODE_OPTIONS:'--require secret'},{'INPUT_CHECKSUMS-SHA256':'bad'},{'INPUT_GITHUB-TOKEN':'secret😀'}]) {
     await assert.rejects(install({...f.env,...patch},runtime,client));
     assert.equal(await fs.readFile(f.paths,'utf8'),'');assert.equal(await fs.readFile(f.output,'utf8'),'');
   }
@@ -28,6 +28,20 @@ test('invalid archives leave no installation or output',async t=>{
   await assert.rejects(install(x.env,runtime,client));
   assert.equal(await fs.readFile(x.paths,'utf8'),'');assert.equal(await fs.readFile(x.output,'utf8'),'');
   assert.deepEqual((await fs.readdir(x.tmp)).sort(),['output','path']);
+});
+test('failed native execution cleans up installation on every OS',async t=>{
+  const x=await fixture(t);const win=process.platform==='win32';
+  const target=require('../src/policy.cjs').platform(runtime.os,runtime.arch,x.env);
+  const root=`shoutx-v0.3.0-rc.1-${target.target}`;
+  const entries=f.files(root,target.executable,Buffer.from('invalid executable ::error::secret'));
+  const client={download:async()=>({bytes:(win?f.zip:f.tar)(entries),root})};
+  await assert.rejects(install({...x.env,SystemRoot:process.env.SystemRoot},runtime,client));
+  assert.equal(await fs.readFile(x.paths,'utf8'),'');assert.equal(await fs.readFile(x.output,'utf8'),'');
+  assert.deepEqual((await fs.readdir(x.tmp)).sort(),['output','path']);
+});
+test('symlink command files are rejected before network', {skip:process.platform==='win32'},async t=>{
+  const x=await fixture(t);const link=path.join(x.tmp,'link');await fs.symlink(x.paths,link);
+  let calls=0;await assert.rejects(install({...x.env,GITHUB_PATH:link},runtime,{download:async()=>{calls++;}}));assert.equal(calls,0);
 });
 test('successful installation closes stdin, uses minimal environment, emits only file records', {skip:process.platform==='win32'},async t=>{
   const x=await fixture(t);const root='shoutx-v0.3.0-rc.1-x86_64-unknown-linux-musl';
@@ -52,9 +66,12 @@ test('shipped launcher emits one fixed diagnostic and no untrusted bytes',async 
     assert.equal(result.status,1);assert.equal(result.stdout,'');assert.equal(result.stderr,'setup-shoutx: installation failed\n');
   }
   await fs.copyFile(launcher,path.join(x.tmp,'index.cjs'));
-  for(const body of [null,'throw new Error("::error::secret");','module.exports.install=()=>Promise.reject(new Error("secret"));','process.emitWarning("::error::secret"); module.exports.install=()=>{};','module.exports.install=()=>{setImmediate(()=>{throw new Error("secret")})};']) {
+  for(const body of [null,'throw new Error("::error::secret");','module.exports.install=()=>Promise.reject(new Error("secret"));','module.exports.install=()=>{setImmediate(()=>{throw new Error("secret")})};']) {
     if(body!==null) await fs.writeFile(path.join(x.tmp,'bundle.cjs'),body);
     const result=spawnSync(process.execPath,[path.join(x.tmp,'index.cjs')],{env:{...process.env,...x.env},encoding:'utf8',timeout:15000});
     assert.equal(result.status,1);assert.equal(result.stdout,'');assert.equal(result.stderr,'setup-shoutx: installation failed\n');
   }
+  await fs.writeFile(path.join(x.tmp,'bundle.cjs'),'process.emitWarning("::error::secret"); module.exports.install=()=>{};');
+  const warning=spawnSync(process.execPath,[path.join(x.tmp,'index.cjs')],{encoding:'utf8',timeout:15000});
+  assert.equal(warning.status,0);assert.equal(warning.stdout,'');assert.equal(warning.stderr,'');
 });

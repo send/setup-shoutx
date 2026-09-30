@@ -40,6 +40,10 @@ jobs:
           test "$INSTALLED_VERSION" = '0.3.0-rc.1'
           test "$(shoutx --version)" = 'shoutx 0.3.0-rc.1'
           test "$(shoutx github-actions:output test value)" = 'test=value'
+      - name: Check shipped entry silence and wrong-pin rejection
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node test/real-install.cjs
   result:
     name: CI result
     if: ${{ always() }}

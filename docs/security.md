@@ -20,7 +20,9 @@ digests, complete archive validation, writing only the executable, captured
 version check, version output, and finally PATH append. A failure before the
 append phase writes no environment-file records. Output I/O is not
 transactional: a failed write can leave partial records or an already-written
-version output. A failed install removes its private directory; successful
+version output. An ordinarily rejected install removes its private directory;
+forced process termination, an uncaught exception, or a cleanup I/O failure
+can leave private temporary files for runner cleanup. Successful
 directories remain for the job and are writable by subsequent same-user steps.
 
 The only download authority starts are `api.github.com/repos/send/shoutx` and
@@ -32,7 +34,8 @@ final CDN hostnames are not pinned. Tokens are absent on all redirect requests
 environment selects another repository, URL, executable, archive, or transport.
 
 The HTTP client does not use environment proxy settings. Nonempty
-`NODE_OPTIONS`, `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`, or `SSL_CERT_DIR` are
+`NODE_OPTIONS`, `NODE_EXTRA_CA_CERTS`, `NODE_USE_ENV_PROXY`, `NODE_USE_SYSTEM_CA`,
+`SSL_CERT_FILE`, or `SSL_CERT_DIR` are
 rejected; `NODE_TLS_REJECT_UNAUTHORIZED` must be absent or `1`. The runner may
 apply Node startup options before our launcher; a compromised startup is
 outside the trust boundary. GitHub API/server environment overrides must be
@@ -90,7 +93,8 @@ the manifest and API digest both constrain the selected archive.
 ## Diagnostic boundary
 
 The launcher installs warning, uncaught-exception and unhandled-rejection
-handlers before loading the bundle. Action-controlled failures emit one fixed
+handlers before loading the bundle. Warnings are silently suppressed.
+Action-controlled failures emit one fixed
 ASCII line, never exception objects, input, paths, downloaded data, response
 bodies, or child output. Success is silent. A launcher parse error, Node fatal
 abort, runtime startup diagnostic, or runner-generated message precedes or

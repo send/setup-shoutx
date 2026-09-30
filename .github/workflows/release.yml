@@ -44,6 +44,7 @@ jobs:
           done
   publish:
     needs: verify
+    environment: release
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -54,13 +55,21 @@ jobs:
       TAG: ${{ github.ref_name }}
       PRERELEASE: ${{ needs.verify.outputs.prerelease }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version-file: .node-version
       - name: Publish action release
         shell: bash
         run: |
           set -euo pipefail
-          test "$(gh api "repos/$GH_REPO/commits/$TAG" --jq '.sha')" = "$GITHUB_SHA"
+          node scripts/check-release-tag.cjs
           args=("$TAG" --draft --verify-tag --generate-notes)
           if [[ "$PRERELEASE" == true ]]; then args+=(--prerelease); fi
           gh release create "${args[@]}"
+          node scripts/check-release-tag.cjs
           gh release edit "$TAG" --draft=false --prerelease="$PRERELEASE" --latest=false
           gh api "repos/$GH_REPO/releases/tags/$TAG" --jq '.immutable' | grep -qx true
+          node scripts/check-release-tag.cjs
