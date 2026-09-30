@@ -62,14 +62,4 @@ jobs:
         with:
           node-version-file: .node-version
       - name: Publish action release
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/check-release-tag.cjs
-          args=("$TAG" --draft --verify-tag --generate-notes)
-          if [[ "$PRERELEASE" == true ]]; then args+=(--prerelease); fi
-          gh release create "${args[@]}"
-          node scripts/check-release-tag.cjs
-          gh release edit "$TAG" --draft=false --prerelease="$PRERELEASE" --latest=false
-          gh api "repos/$GH_REPO/releases/tags/$TAG" --jq '.immutable' | grep -qx true
-          node scripts/check-release-tag.cjs
+        run: node scripts/publish-release.cjs

@@ -27,5 +27,6 @@ test('manifest grammar, hashes, duplicates and unrelated files', () => {
 });
 test('TLS and alternate GitHub environment settings fail closed', () => {
   p.environment({}); p.environment({NODE_TLS_REJECT_UNAUTHORIZED:'1'});
+  for(const key of ['NODE_DEBUG','NODE_DEBUG_NATIVE','OPENSSL_CONF']) assert.throws(()=>p.environment({[key]:'http'}));
   for(const [key,value] of [['NODE_OPTIONS','--require hostile'],['NODE_TLS_REJECT_UNAUTHORIZED','0'],['NODE_EXTRA_CA_CERTS','hostile'],['NODE_USE_ENV_PROXY','1'],['NODE_USE_SYSTEM_CA','1'],['SSL_CERT_DIR','hostile'],['GITHUB_API_URL','https://evil.example']]) assert.throws(()=>p.environment({[key]:value}));
 });

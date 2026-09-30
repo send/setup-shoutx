@@ -35,7 +35,7 @@ environment selects another repository, URL, executable, archive, or transport.
 
 The HTTP client does not use environment proxy settings. Nonempty
 `NODE_OPTIONS`, `NODE_EXTRA_CA_CERTS`, `NODE_USE_ENV_PROXY`, `NODE_USE_SYSTEM_CA`,
-`SSL_CERT_FILE`, or `SSL_CERT_DIR` are
+`NODE_DEBUG`, `NODE_DEBUG_NATIVE`, `OPENSSL_CONF`, `SSL_CERT_FILE`, or `SSL_CERT_DIR` are
 rejected; `NODE_TLS_REJECT_UNAUTHORIZED` must be absent or `1`. The runner may
 apply Node startup options before our launcher; a compromised startup is
 outside the trust boundary. GitHub API/server environment overrides must be
@@ -98,7 +98,9 @@ Action-controlled failures emit one fixed
 ASCII line, never exception objects, input, paths, downloaded data, response
 bodies, or child output. Success is silent. A launcher parse error, Node fatal
 abort, runtime startup diagnostic, or runner-generated message precedes or
-escapes those handlers and is outside this claim.
+escapes those handlers and is outside this claim. In particular, runtime debug
+output emitted before the launcher executes cannot be suppressed by the action;
+debug settings are rejected before any token-bearing network request.
 
 The dependency-injected HTTP seam is exported for module-level tests only.
 It cannot be selected by action inputs or environment variables. Shipped-entry

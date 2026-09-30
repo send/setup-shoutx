@@ -31,5 +31,12 @@ a claim to cover every TLS/socket failure. Resource limits rely on Node's
 bounded inflater plus independent declared-size/stream-byte checks; CI does not
 allocate an oversized 256 MiB fixture on every runner.
 
-Review of the corrective revision is required before handoff. A completed
+The follow-up Fable review of `3a427d4` confirmed the named corrections and no
+remaining high/medium findings. Two new low findings were accepted: reject
+Node debug/OpenSSL configuration before token-bearing requests, and publish
+only the newly created release ID after refusing existing drafts. Regression
+tests cover debug rejection, release identity, unexpected assets, and mutable
+publication. The publication script is tested without network writes.
+
+Review of these final corrections is required before handoff. A completed
 implementation PR is not authorization to publish an action release.

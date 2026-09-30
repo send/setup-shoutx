@@ -15,7 +15,7 @@ async function fixture(t) {
 }
 test('invalid inputs or command files fail before network and leave files unchanged',async t=>{
   const f=await fixture(t);let calls=0;const client={download:async()=>{calls++;throw new Error('::error::secret');}};
-  for(const patch of [{'INPUT_SHOUTX-VERSION':'latest'},{RUNNER_ARCH:'invalid'},{GITHUB_PATH:''},{GITHUB_PATH:f.tmp},{GITHUB_PATH:path.join(f.tmp,'missing')},{GITHUB_OUTPUT:f.paths},{NODE_OPTIONS:'--require secret'},{'INPUT_CHECKSUMS-SHA256':'bad'},{'INPUT_GITHUB-TOKEN':'secret😀'}]) {
+  for(const patch of [{'INPUT_SHOUTX-VERSION':'latest'},{RUNNER_ARCH:'invalid'},{GITHUB_PATH:''},{GITHUB_PATH:f.tmp},{GITHUB_PATH:path.join(f.tmp,'missing')},{GITHUB_OUTPUT:f.paths},{NODE_OPTIONS:'--require secret'},{NODE_DEBUG:'http'},{'INPUT_CHECKSUMS-SHA256':'bad'},{'INPUT_GITHUB-TOKEN':'secret😀'}]) {
     await assert.rejects(install({...f.env,...patch},runtime,client));
     assert.equal(await fs.readFile(f.paths,'utf8'),'');assert.equal(await fs.readFile(f.output,'utf8'),'');
   }
@@ -61,7 +61,7 @@ test('wrong version, child stderr, excessive output, crash and timeout reject', 
 });
 test('shipped launcher emits one fixed diagnostic and no untrusted bytes',async t=>{
   const x=await fixture(t);const launcher=path.join(__dirname,'../dist/index.cjs');
-  for(const patch of [{'INPUT_SHOUTX-VERSION':'::error::secret\n'},{GITHUB_PATH:'::error::secret'},{'INPUT_GITHUB-TOKEN':'secret\r\n::error::evil'},{GITHUB_OUTPUT:''}]) {
+  for(const patch of [{'INPUT_SHOUTX-VERSION':'::error::secret\n'},{GITHUB_PATH:'::error::secret'},{'INPUT_GITHUB-TOKEN':'secret\r\n::error::evil'},{NODE_DEBUG:'http,https','INPUT_GITHUB-TOKEN':'secret'},{GITHUB_OUTPUT:''}]) {
     const result=spawnSync(process.execPath,[launcher],{env:{...process.env,...x.env,...patch},encoding:'utf8',timeout:15000});
     assert.equal(result.status,1);assert.equal(result.stdout,'');assert.equal(result.stderr,'setup-shoutx: installation failed\n');
   }

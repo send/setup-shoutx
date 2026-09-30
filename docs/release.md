@@ -26,6 +26,11 @@ do not recommend that version. Use a new version instead of modifying a
 published immutable tag. The workflow does not move GitHub's latest pointer;
 stable-version promotion is a separate maintainer decision. A failed draft is
 retained for inspection and must be handled manually before retrying.
+The publisher refuses existing releases or drafts for the tag, captures the
+created release ID, and uses that ID for subsequent reads and publication.
+It requires zero uploaded assets before and after publishing; the action ships
+in the tag tree. Full tag resolution is checked before creation, publication,
+and after immutability is confirmed.
 
 Release tags include `dist/` and the lockfile; consumers do not run npm.
 There are no npm dependencies at present. New dependencies require a concrete

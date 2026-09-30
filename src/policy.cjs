@@ -54,7 +54,7 @@ function absolutePath(value, os) {
   return value;
 }
 function environment(env) {
-  for (const key of ['NODE_OPTIONS', 'NODE_EXTRA_CA_CERTS', 'NODE_USE_ENV_PROXY', 'NODE_USE_SYSTEM_CA', 'SSL_CERT_FILE', 'SSL_CERT_DIR']) ensure(!env[key]);
+  for (const key of ['NODE_OPTIONS', 'NODE_EXTRA_CA_CERTS', 'NODE_USE_ENV_PROXY', 'NODE_USE_SYSTEM_CA', 'NODE_DEBUG', 'NODE_DEBUG_NATIVE', 'OPENSSL_CONF', 'SSL_CERT_FILE', 'SSL_CERT_DIR']) ensure(!env[key]);
   ensure(env.NODE_TLS_REJECT_UNAUTHORIZED === undefined || env.NODE_TLS_REJECT_UNAUTHORIZED === '1');
   ensure(!env.GITHUB_API_URL || env.GITHUB_API_URL === 'https://api.github.com');
   ensure(!env.GITHUB_SERVER_URL || env.GITHUB_SERVER_URL === 'https://github.com');
