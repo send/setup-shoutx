@@ -1,7 +1,9 @@
 # Action release procedure
 
-No action release exists yet. The initial implementation PR does not authorize
-a release. Action and CLI versions are independent.
+Action and CLI versions are independent. The currently documented action
+release and pinned usage example are maintained in the [README](../README.md).
+Updating that example or the CLI version exercised by CI does not itself
+require a new action release when the shipped action is unchanged.
 
 Before creating a full SemVer action tag:
 
