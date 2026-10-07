@@ -14,6 +14,9 @@ jobs:
         os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-15, windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
+    env:
+      CLI_VERSION: '0.3.0'
+      CLI_CHECKSUMS_SHA256: fe1055022c9454a344e2b2db52b99eaf5d787213c550888029b4ad424470185d
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -29,16 +32,36 @@ jobs:
         id: install
         uses: ./
         with:
-          shoutx-version: '0.3.0-rc.1'
-          checksums-sha256: b280ecb4122b02c0961638c0eb84bae6932af55193c3ea9ae2aa2b02ef8afa99
+          shoutx-version: ${{ env.CLI_VERSION }}
+          checksums-sha256: ${{ env.CLI_CHECKSUMS_SHA256 }}
           github-token: ${{ github.token }}
       - name: Verify output and subsequent-step PATH
+        id: local-check
         shell: bash
         env:
           INSTALLED_VERSION: ${{ steps.install.outputs.version }}
         run: |
-          test "$INSTALLED_VERSION" = '0.3.0-rc.1'
-          test "$(shoutx --version)" = 'shoutx 0.3.0-rc.1'
+          test "$INSTALLED_VERSION" = "$CLI_VERSION"
+          test "$(shoutx --version)" = "shoutx $CLI_VERSION"
+          test "$(shoutx github-actions:output test value)" = 'test=value'
+          printf 'executable=%s\n' "$(command -v shoutx)" >> "$GITHUB_OUTPUT"
+      - name: Install with documented published action
+        id: published
+        uses: send/setup-shoutx@eb61a2361c6c0e0d37ab9cca1c50e998b4a94c24 # v0.1.0
+        with:
+          shoutx-version: ${{ env.CLI_VERSION }}
+          checksums-sha256: ${{ env.CLI_CHECKSUMS_SHA256 }}
+          github-token: ${{ github.token }}
+      - name: Verify published action output and subsequent-step PATH
+        shell: bash
+        env:
+          INSTALLED_VERSION: ${{ steps.published.outputs.version }}
+          PREVIOUS_EXECUTABLE: ${{ steps.local-check.outputs.executable }}
+        run: |
+          test "$INSTALLED_VERSION" = "$CLI_VERSION"
+          test -n "$PREVIOUS_EXECUTABLE"
+          test "$(command -v shoutx)" != "$PREVIOUS_EXECUTABLE"
+          test "$(shoutx --version)" = "shoutx $CLI_VERSION"
           test "$(shoutx github-actions:output test value)" = 'test=value'
       - name: Check shipped entry silence and wrong-pin rejection
         env:

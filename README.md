@@ -2,27 +2,27 @@
 
 Install verified [shoutx](https://github.com/send/shoutx) releases in GitHub Actions.
 
-Status: implementation in progress; no action release is available yet.
+The action is available as [v0.1.0](https://github.com/send/setup-shoutx/releases/tag/v0.1.0).
 
 ## Usage
 
-After reviewing and pinning an action commit, use:
+Pin the published action commit, CLI version and checksum manifest independently:
 
 ```yaml
 permissions:
   contents: read
 steps:
-  - uses: send/setup-shoutx@REVIEWED_FULL_COMMIT_SHA
+  - uses: send/setup-shoutx@eb61a2361c6c0e0d37ab9cca1c50e998b4a94c24 # v0.1.0
     with:
-      shoutx-version: '0.3.0-rc.1'
-      checksums-sha256: b280ecb4122b02c0961638c0eb84bae6932af55193c3ea9ae2aa2b02ef8afa99
+      shoutx-version: '0.3.0'
+      checksums-sha256: fe1055022c9454a344e2b2db52b99eaf5d787213c550888029b4ad424470185d
       github-token: ${{ github.token }}
   - run: shoutx --version
 ```
 
-Replace `REVIEWED_FULL_COMMIT_SHA` with a reviewed 40-character commit. This
-placeholder is not a published action version. CLI and action versions are
-independent. Run setup before untrusted steps.
+CLI and action versions are independent. The digest above pins the
+`SHA256SUMS` manifest for shoutx v0.3.0; update it when selecting another CLI
+release. Run setup before untrusted steps.
 
 `shoutx-version` is required and must be an exact canonical version without
 `v`, whitespace, build metadata, ranges, or aliases. Releases before
@@ -41,6 +41,10 @@ and Windows x86-64. The action uses the runner's Node 24 runtime. Container
 jobs, self-hosted runners, GHES, ARC, proxies, and other architectures have no
 support guarantee. Windows runner paths must be drive-absolute; UNC and device
 paths are deliberately outside this installer's supported subset.
+
+Successful installation does not expand the CLI's destination-specific support
+scope. For mask and annotation commands, consult shoutx's
+[current compatibility record](https://github.com/send/shoutx/blob/main/docs/compatibility/stdout-unicode-policy.md).
 
 The installer checks repository identity, immutable release metadata, API
 asset digests, the checksum manifest, the archive, and exact `--version` output.
