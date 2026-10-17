@@ -15,8 +15,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     env:
-      CLI_VERSION: '0.3.0'
-      CLI_CHECKSUMS_SHA256: fe1055022c9454a344e2b2db52b99eaf5d787213c550888029b4ad424470185d
+      CLI_VERSION: '1.0.0'
+      CLI_CHECKSUMS_SHA256: a6336c0e538c54e1fe4e35025983694e4f60ba9ab8aefda740796ab95ee13875
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
