@@ -119,3 +119,20 @@ release bytes. Passing synthetic tests alone is insufficient release evidence.
 
 Report suspected vulnerabilities through GitHub private vulnerability reporting
 when enabled, rather than including secrets in a public issue.
+
+
+## Azure Pipelines template
+
+The Azure adapter uses the same version/provider selection, HTTPS client,
+archive validation and native version check. Trust the pinned template
+repository, service connection, hosted agent, Node tool selection, and agent
+temporary directory. Match the native platform and architecture against Azure
+agent metadata. Setup runs before untrusted steps in the job.
+
+After verification the adapter emits one `task.prependpath` record containing
+the newly generated absolute directory. Its trusted temporary root must also
+fit the hosted path subset (ASCII letters, digits, spaces, slash, backslash,
+colon, dot, underscore and hyphen, subject to the platform path restrictions).
+This keeps the generated record free of Azure escape sequences and command
+delimiters. Failures before PATH registration emit no record and ordinary
+failures remove the temporary installation.

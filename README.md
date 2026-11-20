@@ -59,6 +59,47 @@ It does not verify artifact attestations. No persistent cache or runtime npm
 installation is used. See [the security contract](docs/security.md) for limits
 and failure behavior.
 
+## Azure Pipelines (development branch)
+
+Use the external steps template with a GitHub service connection that can read
+`send/setup-shoutx`. Pin the repository resource to a reviewed commit containing
+the template. The alias `setupShoutx` is also used to check out the installer's
+scripts. This example works with a published CLI on an Azure-hosted agent:
+
+```yaml
+pool:
+  vmImage: ubuntu-24.04
+resources:
+  repositories:
+    - repository: setupShoutx
+      type: github
+      endpoint: YOUR_GITHUB_SERVICE_CONNECTION
+      name: send/setup-shoutx
+      ref: YOUR_REVIEWED_40_CHARACTER_COMMIT
+steps:
+  - checkout: self
+  - template: /azure-pipelines.yml@setupShoutx
+    parameters:
+      shoutxVersion: '1.0.0'
+      provider: github-actions
+      checksumsSha256: a6336c0e538c54e1fe4e35025983694e4f60ba9ab8aefda740796ab95ee13875
+  - pwsh: shoutx --version
+```
+
+For a provider-split CLI release, set its exact version and manifest pin and
+omit `provider` to install the Azure Pipelines binary. Until the first split
+release, the hosted smoke test uses the explicit GitHub Actions selection above.
+For authenticated GitHub metadata requests, pass a secret variable reference
+such as `githubToken: $(setupGithubToken)`. The repository service connection
+is used for checkout, independently of this optional download credential.
+
+The template checks out its pinned resource to `$(Pipeline.Workspace)/setup-shoutx-tools`
+and selects Node 24 using `UseNode@1`. Include an explicit `checkout: self`
+if the job uses your own source. With multiple checkouts, use an explicit
+checkout path if later steps depend on the location of your source. The CLI
+is installed under the agent temp directory and added to PATH for subsequent
+steps in the same job.
+
 ## Development
 
 Use Node 24 (the exact CI version is in `.node-version`). There are no npm

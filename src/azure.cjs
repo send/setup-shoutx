@@ -6,7 +6,11 @@ const { ensure, environment, expectedDigest, nativePlatform, selectArtifact, abs
 const { createClient } = require('./client.cjs');
 const { installArtifact } = require('./artifact.cjs');
 
-async function installAzure(env = process.env, runtime = process, client = createClient(), emit = line => writeSync(1, line)) {
+function writePathRecord(line) {
+  ensure(writeSync(1, line) === Buffer.byteLength(line));
+}
+
+async function installAzure(env = process.env, runtime = process, client = createClient(), emit = writePathRecord) {
   environment(env);
   const target = nativePlatform(runtime.platform, runtime.arch);
   ensure(env.AGENT_OS === {linux:'Linux', darwin:'Darwin', win32:'Windows_NT'}[target.os]);
