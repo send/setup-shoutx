@@ -31,9 +31,8 @@ workflow-local constraint on the entire checksum manifest; use lowercase hex.
 `github-token` is optional and only sent on initial fixed-origin API requests.
 Without it, unauthenticated API rate limits can cause installation failure.
 
-On the development branch, the optional `provider` input selects the CLI to
-install: `github-actions` (default) or `azure-pipelines`. This input will be
-available in the next action release. Both choices run the installer inside
+In the v0.2.0 source, the optional `provider` input selects the CLI to
+install: `github-actions` (default) or `azure-pipelines`. The pinned v0.1.0 example above uses the legacy layout. Both choices run the installer inside
 GitHub Actions. Published CLI versions through 1.0.0 have only a GitHub Actions
 binary; selecting Azure for one of those versions fails before downloading.
 Later CLI versions use the provider-specific release archives.
@@ -59,7 +58,7 @@ It does not verify artifact attestations. No persistent cache or runtime npm
 installation is used. See [the security contract](docs/security.md) for limits
 and failure behavior.
 
-## Azure Pipelines (development branch)
+## Azure Pipelines (v0.2.0)
 
 Use the external steps template with a GitHub service connection that can read
 `send/setup-shoutx`. Pin the repository resource to a reviewed commit containing
@@ -87,8 +86,7 @@ steps:
 ```
 
 For a provider-split CLI release, set its exact version and manifest pin and
-omit `provider` to install the Azure Pipelines binary. Until the first split
-release, the hosted smoke test uses the explicit GitHub Actions selection above.
+omit `provider` to install the Azure Pipelines binary. The legacy compatibility smoke test uses the explicit GitHub Actions selection above.
 For authenticated GitHub metadata requests, pass a secret variable reference
 such as `githubToken: $(setupGithubToken)`. The repository service connection
 is used for checkout, independently of this optional download credential.
