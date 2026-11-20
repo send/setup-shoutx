@@ -1,0 +1,35 @@
+trigger: none
+pr: none
+
+resources:
+  repositories:
+    - repository: setupShoutx
+      type: github
+      endpoint: github.com_send
+      name: send/setup-shoutx
+      ref: ${{ variables['Build.SourceBranch'] }}
+
+jobs:
+  - job: install
+    strategy:
+      matrix:
+        linux:
+          image: ubuntu-24.04
+        windows:
+          image: windows-2025
+    pool:
+      vmImage: $(image)
+    steps:
+      - template: /azure-pipelines.yml@setupShoutx
+        parameters:
+          provider: github-actions
+          shoutxVersion: '1.0.0'
+          checksumsSha256: a6336c0e538c54e1fe4e35025983694e4f60ba9ab8aefda740796ab95ee13875
+      - pwsh: |
+          $exe = (Get-Command shoutx -CommandType Application).Source
+          $directory = Split-Path $exe
+          if ((Split-Path $directory) -ne $env:AGENT_TEMPDIRECTORY -or
+              (Split-Path -Leaf $directory) -notlike 'setup-shoutx-*') { throw 'Unexpected binary location' }
+          if ((& $exe --version) -ne 'shoutx 1.0.0' -or $LASTEXITCODE -ne 0) { throw 'Version mismatch' }
+        workingDirectory: $(Pipeline.Workspace)
+        displayName: Verify next-step PATH and version

@@ -16,7 +16,8 @@ process.on('uncaughtException', () => fail());
 process.on('unhandledRejection', () => fail());
 try {
   const bundle = require('./bundle.cjs');
-  Promise.resolve(bundle.install()).catch(error => {
+  const install = process.argv[2] === '--azure-pipelines' ? bundle.installAzure : bundle.install;
+  Promise.resolve(install()).catch(error => {
     if (error && error === bundle.unavailableProvider) fail('setup-shoutx: this shoutx version has no Azure Pipelines binary\n');
     else fail();
   });
