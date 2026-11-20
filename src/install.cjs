@@ -36,4 +36,4 @@ async function install(env = process.env, runtime = { os: process.platform, arch
     if (directory && !installed) await fs.rm(directory, { recursive: true, force: true });
   }
 }
-module.exports = { install, unavailableProvider };
+module.exports = { install, installAzure: require('./azure.cjs').installAzure, unavailableProvider };

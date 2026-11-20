@@ -47,17 +47,18 @@ function comparePre(a, b) {
   }
   return Math.sign(a.length - b.length);
 }
-function platform(os, arch, env) {
-  const entries = {
-    'linux/x64': ['Linux', 'X64', 'x86_64-unknown-linux-musl'],
-    'linux/arm64': ['Linux', 'ARM64', 'aarch64-unknown-linux-musl'],
-    'darwin/x64': ['macOS', 'X64', 'x86_64-apple-darwin'],
-    'darwin/arm64': ['macOS', 'ARM64', 'aarch64-apple-darwin'],
-    'win32/x64': ['Windows', 'X64', 'x86_64-pc-windows-msvc'],
+function nativePlatform(os, arch) {
+  const targets = {
+    'linux/x64': 'x86_64-unknown-linux-musl', 'linux/arm64': 'aarch64-unknown-linux-musl',
+    'darwin/x64': 'x86_64-apple-darwin', 'darwin/arm64': 'aarch64-apple-darwin',
+    'win32/x64': 'x86_64-pc-windows-msvc',
   };
-  const entry = entries[`${os}/${arch}`];
-  ensure(entry && env.RUNNER_OS === entry[0] && env.RUNNER_ARCH === entry[1]);
-  return { os, target: entry[2], extension: os === 'win32' ? 'zip' : 'tar.gz', executable: os === 'win32' ? 'shoutx.exe' : 'shoutx' };
+  const target = targets[`${os}/${arch}`]; ensure(target);
+  return { os, target, extension: os === 'win32' ? 'zip' : 'tar.gz', executable: os === 'win32' ? 'shoutx.exe' : 'shoutx' };
+}
+function platform(os, arch, env) {
+  ensure(env.RUNNER_OS === {linux:'Linux', darwin:'macOS', win32:'Windows'}[os] && env.RUNNER_ARCH === arch.toUpperCase());
+  return nativePlatform(os, arch);
 }
 function absolutePath(value, os) {
   text(value); ensure(value.length > 0 && !/[\x00-\x1f\x7f"\uFEFF]/u.test(value));
@@ -87,4 +88,4 @@ function manifest(bytes, selected) {
   }
   ensure(result); return result;
 }
-module.exports = { LIMITS, REPOSITORY, REPOSITORY_ID, ensure, text, version, selectArtifact, unavailableProvider, platform, absolutePath, environment, digest, expectedDigest, manifest };
+module.exports = { LIMITS, REPOSITORY, REPOSITORY_ID, ensure, text, version, selectArtifact, unavailableProvider, nativePlatform, platform, absolutePath, environment, digest, expectedDigest, manifest };

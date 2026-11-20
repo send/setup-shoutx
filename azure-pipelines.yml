@@ -1,0 +1,33 @@
+parameters:
+  - name: shoutxVersion
+    type: string
+  - name: provider
+    type: string
+    default: azure-pipelines
+    values: [azure-pipelines, github-actions]
+  - name: checksumsSha256
+    type: string
+    default: ''
+  - name: githubToken
+    type: string
+    default: ''
+
+steps:
+  - checkout: setupShoutx
+    path: setup-shoutx-tools
+    persistCredentials: false
+  - task: UseNode@1
+    inputs:
+      version: '24.x'
+    displayName: Select Node 24 for setup-shoutx
+  - pwsh: |
+      $entry = Join-Path $env:PIPELINE_WORKSPACE 'setup-shoutx-tools/dist/index.cjs'
+      & node $entry --azure-pipelines
+      exit $LASTEXITCODE
+    displayName: Install verified shoutx
+    workingDirectory: $(Pipeline.Workspace)
+    env:
+      SHOUTX_VERSION: ${{ parameters.shoutxVersion }}
+      SHOUTX_PROVIDER: ${{ parameters.provider }}
+      SHOUTX_CHECKSUMS_SHA256: ${{ parameters.checksumsSha256 }}
+      SHOUTX_GITHUB_TOKEN: ${{ parameters.githubToken }}

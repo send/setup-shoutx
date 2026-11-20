@@ -51,17 +51,18 @@ function comparePre(a, b) {
   }
   return Math.sign(a.length - b.length);
 }
-function platform(os, arch, env) {
-  const entries = {
-    'linux/x64': ['Linux', 'X64', 'x86_64-unknown-linux-musl'],
-    'linux/arm64': ['Linux', 'ARM64', 'aarch64-unknown-linux-musl'],
-    'darwin/x64': ['macOS', 'X64', 'x86_64-apple-darwin'],
-    'darwin/arm64': ['macOS', 'ARM64', 'aarch64-apple-darwin'],
-    'win32/x64': ['Windows', 'X64', 'x86_64-pc-windows-msvc'],
+function nativePlatform(os, arch) {
+  const targets = {
+    'linux/x64': 'x86_64-unknown-linux-musl', 'linux/arm64': 'aarch64-unknown-linux-musl',
+    'darwin/x64': 'x86_64-apple-darwin', 'darwin/arm64': 'aarch64-apple-darwin',
+    'win32/x64': 'x86_64-pc-windows-msvc',
   };
-  const entry = entries[`${os}/${arch}`];
-  ensure(entry && env.RUNNER_OS === entry[0] && env.RUNNER_ARCH === entry[1]);
-  return { os, target: entry[2], extension: os === 'win32' ? 'zip' : 'tar.gz', executable: os === 'win32' ? 'shoutx.exe' : 'shoutx' };
+  const target = targets[`${os}/${arch}`]; ensure(target);
+  return { os, target, extension: os === 'win32' ? 'zip' : 'tar.gz', executable: os === 'win32' ? 'shoutx.exe' : 'shoutx' };
+}
+function platform(os, arch, env) {
+  ensure(env.RUNNER_OS === {linux:'Linux', darwin:'macOS', win32:'Windows'}[os] && env.RUNNER_ARCH === arch.toUpperCase());
+  return nativePlatform(os, arch);
 }
 function absolutePath(value, os) {
   text(value); ensure(value.length > 0 && !/[\x00-\x1f\x7f"\uFEFF]/u.test(value));
@@ -91,7 +92,7 @@ function manifest(bytes, selected) {
   }
   ensure(result); return result;
 }
-module.exports = { LIMITS, REPOSITORY, REPOSITORY_ID, ensure, text, version, selectArtifact, unavailableProvider, platform, absolutePath, environment, digest, expectedDigest, manifest };
+module.exports = { LIMITS, REPOSITORY, REPOSITORY_ID, ensure, text, version, selectArtifact, unavailableProvider, nativePlatform, platform, absolutePath, environment, digest, expectedDigest, manifest };
 
 };
 factories['./client.cjs'] = function(require, module, exports) {
@@ -317,6 +318,45 @@ async function installArtifact(selection, target, directory, token, expected, en
 module.exports = { installArtifact, verifyBinary };
 
 };
+factories['./azure.cjs'] = function(require, module, exports) {
+'use strict';
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const { writeSync } = require('node:fs');
+const { ensure, environment, expectedDigest, nativePlatform, selectArtifact, absolutePath, text } = require('./policy.cjs');
+const { createClient } = require('./client.cjs');
+const { installArtifact } = require('./artifact.cjs');
+
+function writePathRecord(line) {
+  ensure(writeSync(1, line) === Buffer.byteLength(line));
+}
+
+async function installAzure(env = process.env, runtime = process, client = createClient(), emit = writePathRecord) {
+  environment(env);
+  const target = nativePlatform(runtime.platform, runtime.arch);
+  ensure(env.AGENT_OS === {linux:'Linux', darwin:'Darwin', win32:'Windows_NT'}[target.os]);
+  ensure(env.AGENT_OSARCHITECTURE === runtime.arch.toUpperCase());
+  const selection = selectArtifact(env.SHOUTX_VERSION, env.SHOUTX_PROVIDER ?? 'azure-pipelines', target);
+  const expected = expectedDigest(env.SHOUTX_CHECKSUMS_SHA256 || '');
+  const token = text(env.SHOUTX_GITHUB_TOKEN || '', 16384);
+  ensure(/^[\x21-\x7e]*$/.test(token));
+  const root = absolutePath(env.AGENT_TEMPDIRECTORY, target.os);
+  // Only host-generated portable paths enter the agent's stdout command.
+  ensure(/^[A-Za-z0-9/\\: ._-]+$/.test(root));
+  const directory = await fs.mkdtemp(path.join(root, 'setup-shoutx-'));
+  let installed = false;
+  try {
+    await fs.chmod(directory, 0o700);
+    await installArtifact(selection, target, directory, token, expected, env, client);
+    emit(`##vso[task.prependpath]${directory}\n`);
+    installed = true;
+  } finally {
+    if (!installed) await fs.rm(directory, { recursive:true, force:true });
+  }
+}
+module.exports = { installAzure };
+
+};
 factories['./install.cjs'] = function(require, module, exports) {
 'use strict';
 
@@ -356,7 +396,7 @@ async function install(env = process.env, runtime = { os: process.platform, arch
     if (directory && !installed) await fs.rm(directory, { recursive: true, force: true });
   }
 }
-module.exports = { install, unavailableProvider };
+module.exports = { install, installAzure: require('./azure.cjs').installAzure, unavailableProvider };
 
 };
 const cache = Object.create(null);
