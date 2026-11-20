@@ -1,7 +1,7 @@
 # Installer security contract
 
 The normative CLI artifact format is owned by
-[shoutx release contract revision 1](https://github.com/send/shoutx/blob/fb6c5beaff2449901250fe4ced950d7ffaaabcc6/docs/release.md).
+[shoutx release contract](https://github.com/send/shoutx/blob/f74f2cec736d67818523a919b66bc14ef85f16e4/docs/release.md).
 This document owns installer-specific choices and limits. Action input and
 output names are defined in `action.yml`; the README summarizes their use.
 
@@ -31,7 +31,7 @@ URLs. Repository ID must be `1381947214`. API asset URLs must match constructed
 URLs exactly. Every redirect uses HTTPS without URL credentials or fragments;
 final CDN hostnames are not pinned. Tokens are absent on all redirect requests
 (including same-origin redirects) and all asset requests. No input or process
-environment selects another repository, URL, executable, archive, or transport.
+environment supplies an arbitrary repository, URL, archive path, executable name, or transport.
 
 The HTTP client does not use environment proxy settings. Nonempty
 `NODE_OPTIONS`, `NODE_EXTRA_CA_CERTS`, `NODE_USE_ENV_PROXY`, `NODE_USE_SYSTEM_CA`,
@@ -43,7 +43,7 @@ absent or exactly the public GitHub origins.
 
 ## Resource and path limits
 
-- Versions: at most 55 UTF-8 bytes, ASCII Cargo SemVer with u64 numeric core,
+- Versions: at most 55 bytes for revision 1 and 39 for revision 2, ASCII Cargo SemVer with u64 numeric core,
   at least `0.3.0-rc.1` using SemVer prerelease ordering.
 - Manifest pin: empty or exactly 64 lowercase hexadecimal characters.
 - Token: at most 16 KiB, printable non-space ASCII, never persisted or logged.
@@ -72,7 +72,7 @@ exclusive access against a compromised runner or same-user concurrent process.
 
 No general-purpose extraction is used. The parser returns only the executable
 bytes after validating the complete archive. Paths must exactly equal the
-three revision-1 logical files or optional root directory. The root directory
+three logical files or optional root directory. The root directory
 must have no payload. Duplicate names, aliases, case variants, links, and
 special files are rejected. Unsupported encodings fail closed.
 
@@ -94,9 +94,10 @@ the manifest and API digest both constrain the selected archive.
 
 The launcher installs warning, uncaught-exception and unhandled-rejection
 handlers before loading the bundle. Warnings are silently suppressed.
-Action-controlled failures emit one fixed
-ASCII line, never exception objects, input, paths, downloaded data, response
-bodies, or child output. Success is silent. A launcher parse error, Node fatal
+Each action-controlled failure emits one fixed ASCII line. A supported legacy
+version requested for Azure has a dedicated compatibility diagnostic. All other
+failures use the generic installation diagnostic. Neither includes exception
+objects, input, paths, downloaded data, response bodies, or child output. Success is silent. A launcher parse error, Node fatal
 abort, runtime startup diagnostic, or runner-generated message precedes or
 escapes those handlers and is outside this claim. In particular, runtime debug
 output emitted before the launcher executes cannot be suppressed by the action;

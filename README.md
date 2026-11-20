@@ -31,10 +31,17 @@ workflow-local constraint on the entire checksum manifest; use lowercase hex.
 `github-token` is optional and only sent on initial fixed-origin API requests.
 Without it, unauthenticated API rate limits can cause installation failure.
 
+On the development branch, the optional `provider` input selects the CLI to
+install: `github-actions` (default) or `azure-pipelines`. This input will be
+available in the next action release. Both choices run the installer inside
+GitHub Actions. Published CLI versions through 1.0.0 have only a GitHub Actions
+binary; selecting Azure for one of those versions fails before downloading.
+Later CLI versions use the provider-specific release archives.
+
 On success, the action sets the `version` output and adds a fresh installation
 directory to PATH for subsequent steps. It requires existing absolute
 `GITHUB_PATH` and `GITHUB_OUTPUT` files. Nothing is printed on success; failure
-prints only `setup-shoutx: installation failed` to stderr and exits nonzero.
+prints a fixed diagnostic to stderr and exits nonzero.
 
 The native GitHub-hosted matrix covers Linux x86-64/ARM64, macOS x86-64/ARM64,
 and Windows x86-64. The action uses the runner's Node 24 runtime. Container

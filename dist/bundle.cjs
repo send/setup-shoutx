@@ -28,6 +28,19 @@ function version(value) {
   ensure(major > 0n || minor > 3n || (minor === 3n && (patch > 0n || !pre || comparePre(pre, ['rc', '1']) >= 0)));
   return value;
 }
+const unavailableProvider = new Error('provider unavailable for version');
+function selectArtifact(inputVersion, provider, target) {
+  const selected = version(inputVersion);
+  ensure(provider === 'github-actions' || provider === 'azure-pipelines');
+  const core = selected.split('-', 1)[0];
+  const legacy = core.startsWith('0.') || core === '1.0.0';
+  if (legacy && provider === 'azure-pipelines') throw unavailableProvider;
+  if (!legacy) ensure(selected.length <= 39);
+  const tag = `v${selected}`;
+  const prefix = legacy ? 'shoutx' : `shoutx-${provider}`;
+  const root = `${prefix}-${tag}-${target.target}`;
+  return { version: selected, tag, root, filename: `${root}.${target.extension}` };
+}
 function comparePre(a, b) {
   for (let i = 0; i < Math.min(a.length, b.length); i++) {
     if (a[i] === b[i]) continue;
@@ -78,7 +91,7 @@ function manifest(bytes, selected) {
   }
   ensure(result); return result;
 }
-module.exports = { LIMITS, REPOSITORY, REPOSITORY_ID, ensure, text, version, platform, absolutePath, environment, digest, expectedDigest, manifest };
+module.exports = { LIMITS, REPOSITORY, REPOSITORY_ID, ensure, text, version, selectArtifact, unavailableProvider, platform, absolutePath, environment, digest, expectedDigest, manifest };
 
 };
 factories['./client.cjs'] = function(require, module, exports) {
@@ -139,14 +152,11 @@ function createClient(request = https.request) {
   async function json(url, token) {
     return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await get(url, LIMITS.metadata, token)));
   }
-  async function download(version, target, token, expected) {
+  async function download({ tag, filename }, token, expected) {
     const repo = await json(`https://api.github.com/repos/${REPOSITORY}`, token);
     ensure(repo.id === REPOSITORY_ID && repo.full_name === REPOSITORY);
-    const tag = `v${version}`;
     const release = await json(`https://api.github.com/repos/${REPOSITORY}/releases/tags/${tag}`, token);
     ensure(release.tag_name === tag && release.draft === false && release.immutable === true && Array.isArray(release.assets));
-    const root = `shoutx-${tag}-${target.target}`;
-    const filename = `${root}.${target.extension}`;
     function asset(name, bound) {
       const matches = release.assets.filter(a => a.name === name); ensure(matches.length === 1);
       const a = matches[0]; const url = `https://github.com/${REPOSITORY}/releases/download/${tag}/${name}`;
@@ -161,7 +171,7 @@ function createClient(request = https.request) {
     const hash = manifest(sumBytes, filename);
     const bytes = await get(archive.url, LIMITS.archive);
     ensure(bytes.length === archive.size && digest(bytes) === hash && `sha256:${hash}` === archive.digest);
-    return { bytes, root };
+    return bytes;
   }
   return { get, download };
 }
@@ -275,25 +285,16 @@ function extract(bytes, root, target) {
 module.exports = { extract };
 
 };
-factories['./install.cjs'] = function(require, module, exports) {
+factories['./artifact.cjs'] = function(require, module, exports) {
 'use strict';
-
 const fs = require('node:fs/promises');
-const constants = require('node:fs').constants;
 const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
-const { ensure, text, version, platform, absolutePath, environment, expectedDigest, LIMITS } = require('./policy.cjs');
-const { createClient } = require('./client.cjs');
+const { ensure, absolutePath, LIMITS } = require('./policy.cjs');
 const { extract } = require('./archive.cjs');
 const execute = promisify(execFile);
 
-async function openCommandFile(value, os) {
-  absolutePath(value, os); const before = await fs.lstat(value, { bigint: true }); ensure(before.isFile() && !before.isSymbolicLink());
-  const handle = await fs.open(value, constants.O_WRONLY | constants.O_APPEND | (constants.O_NOFOLLOW || 0));
-  try { const after = await handle.stat({ bigint: true }); ensure(after.isFile() && before.dev === after.dev && before.ino === after.ino); return handle; }
-  catch (error) { await handle.close(); throw error; }
-}
 async function verifyBinary(binary, selected, os, env) {
   const childEnv = {};
   if (os === 'win32') {
@@ -305,12 +306,39 @@ async function verifyBinary(binary, selected, os, env) {
   const { stdout, stderr } = await child;
   ensure(stdout.equals(Buffer.from(`shoutx ${selected}\n`)) && stderr.length === 0);
 }
+async function installArtifact(selection, target, directory, token, expected, env, client) {
+  const archive = await client.download(selection, token, expected);
+  const bytes = extract(archive, selection.root, target);
+  const binary = path.join(directory, target.executable);
+  await fs.writeFile(binary, bytes, { flag: 'wx', mode: 0o700 });
+  await fs.chmod(binary, 0o755);
+  await verifyBinary(binary, selection.version, target.os, env);
+}
+module.exports = { installArtifact, verifyBinary };
+
+};
+factories['./install.cjs'] = function(require, module, exports) {
+'use strict';
+
+const fs = require('node:fs/promises');
+const constants = require('node:fs').constants;
+const path = require('node:path');
+const { ensure, text, selectArtifact, unavailableProvider, platform, absolutePath, environment, expectedDigest } = require('./policy.cjs');
+const { createClient } = require('./client.cjs');
+const { installArtifact } = require('./artifact.cjs');
+
+async function openCommandFile(value, os) {
+  absolutePath(value, os); const before = await fs.lstat(value, { bigint: true }); ensure(before.isFile() && !before.isSymbolicLink());
+  const handle = await fs.open(value, constants.O_WRONLY | constants.O_APPEND | (constants.O_NOFOLLOW || 0));
+  try { const after = await handle.stat({ bigint: true }); ensure(after.isFile() && before.dev === after.dev && before.ino === after.ino); return handle; }
+  catch (error) { await handle.close(); throw error; }
+}
 async function install(env = process.env, runtime = { os: process.platform, arch: process.arch }, client = createClient()) {
   environment(env);
-  const selected = version(env['INPUT_SHOUTX-VERSION']);
   const expected = expectedDigest(env['INPUT_CHECKSUMS-SHA256'] || '');
   const token = text(env['INPUT_GITHUB-TOKEN'] || '', 16384); ensure(/^[\x21-\x7e]*$/.test(token));
   const target = platform(runtime.os, runtime.arch, env);
+  const selection = selectArtifact(env['INPUT_SHOUTX-VERSION'], env.INPUT_PROVIDER ?? 'github-actions', target);
   const root = absolutePath(env.RUNNER_TEMP, target.os); ensure((await fs.stat(root)).isDirectory());
   let pathFile; let outputFile; let directory; let installed = false;
   try {
@@ -319,13 +347,8 @@ async function install(env = process.env, runtime = { os: process.platform, arch
     const p = await pathFile.stat({ bigint: true }); const o = await outputFile.stat({ bigint: true }); ensure(p.dev !== o.dev || p.ino !== o.ino);
     directory = await fs.mkdtemp(path.join(root, 'setup-shoutx-')); await fs.chmod(directory, 0o700);
     absolutePath(directory, target.os);
-    const downloaded = await client.download(selected, target, token, expected);
-    const binaryBytes = extract(downloaded.bytes, downloaded.root, target);
-    const binary = path.join(directory, target.executable);
-    await fs.writeFile(binary, binaryBytes, { flag: 'wx', mode: 0o700 });
-    await fs.chmod(binary, 0o755);
-    await verifyBinary(binary, selected, target.os, env);
-    await outputFile.writeFile(`version=${selected}\n`, 'utf8');
+    await installArtifact(selection, target, directory, token, expected, env, client);
+    await outputFile.writeFile(`version=${selection.version}\n`, 'utf8');
     await pathFile.writeFile(`${directory}\n`, 'utf8');
     installed = true;
   } finally {
@@ -333,7 +356,7 @@ async function install(env = process.env, runtime = { os: process.platform, arch
     if (directory && !installed) await fs.rm(directory, { recursive: true, force: true });
   }
 }
-module.exports = { install, verifyBinary };
+module.exports = { install, unavailableProvider };
 
 };
 const cache = Object.create(null);

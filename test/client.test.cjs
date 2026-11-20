@@ -25,19 +25,38 @@ function releaseFixture() {
   return {repo,release,sums,archive};
 }
 function responses(f) {return [{body:JSON.stringify(f.repo)},{body:JSON.stringify(f.release)},{body:f.sums},{body:f.archive}];}
-const target={target:'x86_64-unknown-linux-musl',extension:'tar.gz'};
+const selection = {tag:'v0.3.0-rc.1',filename:'shoutx-v0.3.0-rc.1-x86_64-unknown-linux-musl.tar.gz'};
 test('metadata identity and two independent digest constraints',async()=>{
   const f=releaseFixture();const calls=[];
-  const result=await createClient(transport(responses(f),calls)).download('0.3.0-rc.1',target,'secret',hash(f.sums));
-  assert.deepEqual(result.bytes,f.archive); assert.equal(calls.length,4);
+  const result=await createClient(transport(responses(f),calls)).download(selection,'secret',hash(f.sums));
+  assert.deepEqual(result,f.archive); assert.equal(calls.length,4);
   assert.ok(calls.slice(0,2).every(c=>c.headers.authorization==='Bearer secret'));
   assert.ok(calls.slice(2).every(c=>!c.headers.authorization));
 });
+test('release with both providers downloads only the selected archive', async () => {
+  const tag = 'v1.0.1-rc.1';
+  const base = `https://github.com/send/shoutx/releases/download/${tag}/`;
+  const target = 'x86_64-unknown-linux-musl.tar.gz';
+  const archives = ['github-actions', 'azure-pipelines'].map(provider => ({
+    name: `shoutx-${provider}-${tag}-${target}`, bytes: Buffer.from(provider)
+  }));
+  const sums = Buffer.from(archives.map(({name, bytes}) => `${hash(bytes)}  ${name}\n`).sort().join(''));
+  const assets = [...archives, {name:'SHA256SUMS', bytes:sums}].map(({name, bytes}) => ({
+    name, state:'uploaded', size:bytes.length, digest:`sha256:${hash(bytes)}`, browser_download_url:base + name
+  }));
+  for (const {name, bytes} of archives) {
+    const f = {repo:releaseFixture().repo, release:{tag_name:tag, draft:false, immutable:true, assets}, sums, archive:bytes};
+    const calls = [];
+    const client = createClient(transport(responses(f), calls));
+    assert.deepEqual(await client.download({tag, filename:name}, '', hash(sums)), bytes);
+    assert.equal(calls.at(-1).url, base + name);
+  }
+});
 test('reject identity, mutable releases, duplicate assets, URLs and digest corruption',async()=>{
   for(const mutate of [f=>f.repo.id++,f=>f.repo.full_name='other/shoutx',f=>f.release.immutable=false,f=>f.release.draft=true,f=>f.release.tag_name='v0.3.0',f=>f.release.assets.push(f.release.assets[0]),f=>f.release.assets[0].browser_download_url='https://evil.example',f=>f.release.assets[0].digest='sha256:'+'0'.repeat(64),f=>f.release.assets[1].digest='sha256:'+'0'.repeat(64),f=>f.release.assets[0].state='new',f=>f.sums=Buffer.from('::error::secret'),f=>f.archive=Buffer.from('different')]) {
-    const f=releaseFixture();mutate(f);await assert.rejects(createClient(transport(responses(f))).download('0.3.0-rc.1',target,'',''));
+    const f=releaseFixture();mutate(f);await assert.rejects(createClient(transport(responses(f))).download(selection,'',''));
   }
-  const f=releaseFixture();await assert.rejects(createClient(transport(responses(f))).download('0.3.0-rc.1',target,'','0'.repeat(64)));
+  const f=releaseFixture();await assert.rejects(createClient(transport(responses(f))).download(selection,'','0'.repeat(64)));
 });
 test('redirects strip credentials even on API origin and prohibit downgrade',async()=>{
   for(const location of ['https://api.github.com/next','https://cdn.example/next']) {
