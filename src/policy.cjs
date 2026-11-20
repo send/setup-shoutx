@@ -24,6 +24,19 @@ function version(value) {
   ensure(major > 0n || minor > 3n || (minor === 3n && (patch > 0n || !pre || comparePre(pre, ['rc', '1']) >= 0)));
   return value;
 }
+const unavailableProvider = new Error('provider unavailable for version');
+function selectArtifact(inputVersion, provider, target) {
+  const selected = version(inputVersion);
+  ensure(provider === 'github-actions' || provider === 'azure-pipelines');
+  const core = selected.split('-', 1)[0];
+  const legacy = core.startsWith('0.') || core === '1.0.0';
+  if (legacy && provider === 'azure-pipelines') throw unavailableProvider;
+  if (!legacy) ensure(selected.length <= 39);
+  const tag = `v${selected}`;
+  const prefix = legacy ? 'shoutx' : `shoutx-${provider}`;
+  const root = `${prefix}-${tag}-${target.target}`;
+  return { version: selected, tag, root, filename: `${root}.${target.extension}` };
+}
 function comparePre(a, b) {
   for (let i = 0; i < Math.min(a.length, b.length); i++) {
     if (a[i] === b[i]) continue;
@@ -74,4 +87,4 @@ function manifest(bytes, selected) {
   }
   ensure(result); return result;
 }
-module.exports = { LIMITS, REPOSITORY, REPOSITORY_ID, ensure, text, version, platform, absolutePath, environment, digest, expectedDigest, manifest };
+module.exports = { LIMITS, REPOSITORY, REPOSITORY_ID, ensure, text, version, selectArtifact, unavailableProvider, platform, absolutePath, environment, digest, expectedDigest, manifest };

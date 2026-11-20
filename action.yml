@@ -4,6 +4,10 @@ inputs:
   shoutx-version:
     description: Exact CLI version, without a leading v (at least 0.3.0-rc.1)
     required: true
+  provider:
+    description: CLI provider to install (github-actions or azure-pipelines)
+    required: false
+    default: github-actions
   checksums-sha256:
     description: Optional lowercase SHA-256 of the release SHA256SUMS file
     required: false

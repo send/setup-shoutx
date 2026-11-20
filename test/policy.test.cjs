@@ -30,3 +30,23 @@ test('TLS and alternate GitHub environment settings fail closed', () => {
   for(const key of ['NODE_DEBUG','NODE_DEBUG_NATIVE','OPENSSL_CONF']) assert.throws(()=>p.environment({[key]:'http'}));
   for(const [key,value] of [['NODE_OPTIONS','--require hostile'],['NODE_TLS_REJECT_UNAUTHORIZED','0'],['NODE_EXTRA_CA_CERTS','hostile'],['NODE_USE_ENV_PROXY','1'],['NODE_USE_SYSTEM_CA','1'],['SSL_CERT_DIR','hostile'],['GITHUB_API_URL','https://evil.example']]) assert.throws(()=>p.environment({[key]:value}));
 });
+
+test('version and provider select exactly one release asset and archive root', () => {
+  const target = {target: 'x86_64-pc-windows-msvc', extension: 'zip'};
+  for (const v of ['0.3.0-rc.1', '0.3.0', '1.0.0-rc.1', '1.0.0']) {
+    assert.equal(p.selectArtifact(v, 'github-actions', target).filename, `shoutx-v${v}-x86_64-pc-windows-msvc.zip`);
+    assert.throws(() => p.selectArtifact(v, 'azure-pipelines', target), error => error === p.unavailableProvider);
+  }
+  for (const v of ['1.0.1-rc.1', '1.10.0', '2.0.0']) {
+    for (const provider of ['github-actions', 'azure-pipelines']) {
+      const root = `shoutx-${provider}-v${v}-x86_64-pc-windows-msvc`;
+      assert.deepEqual(p.selectArtifact(v, provider, target), {version:v, tag:`v${v}`, root, filename:`${root}.zip`});
+    }
+  }
+  for (const provider of ['', 'GitHub-Actions', '../azure-pipelines']) {
+    assert.throws(() => p.selectArtifact('1.0.1', provider, target));
+  }
+  const longest = '1.0.1-' + 'x'.repeat(33);
+  assert.doesNotThrow(() => p.selectArtifact(longest, 'azure-pipelines', target));
+  assert.throws(() => p.selectArtifact(longest + 'x', 'azure-pipelines', target));
+});

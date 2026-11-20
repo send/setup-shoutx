@@ -55,14 +55,11 @@ function createClient(request = https.request) {
   async function json(url, token) {
     return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await get(url, LIMITS.metadata, token)));
   }
-  async function download(version, target, token, expected) {
+  async function download({ tag, filename }, token, expected) {
     const repo = await json(`https://api.github.com/repos/${REPOSITORY}`, token);
     ensure(repo.id === REPOSITORY_ID && repo.full_name === REPOSITORY);
-    const tag = `v${version}`;
     const release = await json(`https://api.github.com/repos/${REPOSITORY}/releases/tags/${tag}`, token);
     ensure(release.tag_name === tag && release.draft === false && release.immutable === true && Array.isArray(release.assets));
-    const root = `shoutx-${tag}-${target.target}`;
-    const filename = `${root}.${target.extension}`;
     function asset(name, bound) {
       const matches = release.assets.filter(a => a.name === name); ensure(matches.length === 1);
       const a = matches[0]; const url = `https://github.com/${REPOSITORY}/releases/download/${tag}/${name}`;
@@ -77,7 +74,7 @@ function createClient(request = https.request) {
     const hash = manifest(sumBytes, filename);
     const bytes = await get(archive.url, LIMITS.archive);
     ensure(bytes.length === archive.size && digest(bytes) === hash && `sha256:${hash}` === archive.digest);
-    return { bytes, root };
+    return bytes;
   }
   return { get, download };
 }
