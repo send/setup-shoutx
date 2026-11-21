@@ -11,6 +11,7 @@ resources:
 
 jobs:
   - job: install
+    displayName: Verify legacy single-provider release
     strategy:
       matrix:
         linux:
