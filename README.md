@@ -1,8 +1,8 @@
 # setup-shoutx
 
-Install verified [shoutx](https://github.com/send/shoutx) releases in GitHub Actions.
+Install verified [shoutx](https://github.com/send/shoutx) releases in GitHub Actions or [Azure Pipelines](#azure-pipelines-v020).
 
-The action is available as [v0.1.0](https://github.com/send/setup-shoutx/releases/tag/v0.1.0).
+The action is available as [v0.2.0](https://github.com/send/setup-shoutx/releases/tag/v0.2.0).
 
 ## Usage
 
@@ -12,16 +12,16 @@ Pin the published action commit, CLI version and checksum manifest independently
 permissions:
   contents: read
 steps:
-  - uses: send/setup-shoutx@eb61a2361c6c0e0d37ab9cca1c50e998b4a94c24 # v0.1.0
+  - uses: send/setup-shoutx@4d56952710c9e225285e0474b381d6a10f4d3fdd # v0.2.0
     with:
-      shoutx-version: '0.3.0'
-      checksums-sha256: fe1055022c9454a344e2b2db52b99eaf5d787213c550888029b4ad424470185d
+      shoutx-version: '2.0.0'
+      checksums-sha256: b366c56f14818e856939742c807889af882d881b5fa0ef6ed60ffd63eb3c6553
       github-token: ${{ github.token }}
   - run: shoutx --version
 ```
 
 CLI and action versions are independent. The digest above pins the
-`SHA256SUMS` manifest for shoutx v0.3.0; update it when selecting another CLI
+`SHA256SUMS` manifest for shoutx v2.0.0; update it when selecting another CLI
 release. Run setup before untrusted steps.
 
 `shoutx-version` is required and must be an exact canonical version without
@@ -31,8 +31,8 @@ workflow-local constraint on the entire checksum manifest; use lowercase hex.
 `github-token` is optional and only sent on initial fixed-origin API requests.
 Without it, unauthenticated API rate limits can cause installation failure.
 
-In the v0.2.0 source, the optional `provider` input selects the CLI to
-install: `github-actions` (default) or `azure-pipelines`. The pinned v0.1.0 example above uses the legacy layout. Both choices run the installer inside
+The optional `provider` input selects the CLI to
+install: `github-actions` (default) or `azure-pipelines`. Both choices run the installer inside
 GitHub Actions. Published CLI versions through 1.0.0 have only a GitHub Actions
 binary; selecting Azure for one of those versions fails before downloading.
 Later CLI versions use the provider-specific release archives.
@@ -74,19 +74,17 @@ resources:
       type: github
       endpoint: YOUR_GITHUB_SERVICE_CONNECTION
       name: send/setup-shoutx
-      ref: YOUR_REVIEWED_40_CHARACTER_COMMIT
+      ref: 4d56952710c9e225285e0474b381d6a10f4d3fdd # v0.2.0
 steps:
   - checkout: self
   - template: /azure-pipelines.yml@setupShoutx
     parameters:
-      shoutxVersion: '1.0.0'
-      provider: github-actions
-      checksumsSha256: a6336c0e538c54e1fe4e35025983694e4f60ba9ab8aefda740796ab95ee13875
+      shoutxVersion: '2.0.0'
+      checksumsSha256: b366c56f14818e856939742c807889af882d881b5fa0ef6ed60ffd63eb3c6553
   - pwsh: shoutx --version
 ```
 
-For a provider-split CLI release, set its exact version and manifest pin and
-omit `provider` to install the Azure Pipelines binary. The legacy compatibility smoke test uses the explicit GitHub Actions selection above.
+The template defaults to the Azure Pipelines binary.
 For authenticated GitHub metadata requests, pass a secret variable reference
 such as `githubToken: $(setupGithubToken)`. The repository service connection
 is used for checkout, independently of this optional download credential.
